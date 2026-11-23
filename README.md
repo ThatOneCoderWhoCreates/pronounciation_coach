@@ -36,16 +36,27 @@ experiments. How long it takes depends mostly on the download speed. After that 
 
 ### Windows 10/11
 
-Install Python 3.12 from python.org (tick "Add python.exe to PATH") and, optionally, ffmpeg
-(`winget install Gyan.FFmpeg`). Then double-click `setup_windows.bat`. To start the app later:
+1. Install Python 3.12 from https://www.python.org/downloads/ and tick **Add python.exe to PATH**
+   on the first screen of the installer.
+2. Optional: install ffmpeg. In PowerShell run `winget install Gyan.FFmpeg`, then open a new window.
+3. Put the project in a short local folder such as `C:\pronunciation_coach`. Avoid OneDrive-synced
+   folders (Desktop and Documents are often synced): OneDrive can lock files while the models download.
+4. Double-click `setup_windows.bat` and wait for "Setup complete".
+5. Double-click `run_app.bat` whenever you want to start the app.
+
+From Command Prompt or PowerShell, the same two steps are:
 
 ```
-.venv\Scripts\activate
+.\setup_windows.bat
 ```
 
 ```
-python app.py
+.\run_app.bat
 ```
+
+The scripts call `.venv\Scripts\python.exe` directly, so there is no need to "activate" the
+environment (PowerShell blocks `Activate.ps1` by default). To run a single script by hand, use the
+same Python, for example `.venv\Scripts\python.exe -m pytest -q`.
 
 The app opens at http://127.0.0.1:7860. Use `python app.py --no-browser` to stop it from opening
 a tab, or `--port 7861` to change the port.
@@ -93,11 +104,12 @@ pronunciation_coach/
   data/models/           downloaded Whisper models (filled by setup)
   data/calibration.json  calibrated (good, bad) costs (written by calibrate.py)
   demo/                  clips to upload if the microphone fails (made by setup)
-  tests/                 pytest tests with synthetic audio (44 tests, no internet needed)
+  tests/                 pytest tests with synthetic audio (45 tests, no internet needed)
   experiments/           run_experiments.py, helpers.py, results/results.md
   scripts/               calibrate.py, pregenerate_references.py, prefetch_models.py, make_demo_audio.py
   setup.sh               one-time setup for macOS and Linux
   setup_windows.bat      one-time setup for Windows
+  run_app.bat            starts the app on Windows (double-click)
 ```
 
 ## 5. The signal processing chain (for the viva)
@@ -189,8 +201,22 @@ Transcript colors: green correct, red wrong (shows what Whisper heard), gray mis
   is too old for numpy 2.4+.
 - **ffmpeg:** recommended, not required. wav and mp3 work without it.
 - **pyttsx3:** runs in a separate process with a fresh engine for every sentence, because calling
-  it from Gradio's worker threads hangs on Windows. On macOS, if pyttsx3 fails, the built-in
-  `say` command is used. macOS writes AIFF files, which soundfile reads.
+  it from Gradio's worker threads hangs on Windows. On Windows it uses the SAPI5 voices; the helper
+  process starts without a console window. On macOS, if pyttsx3 fails, the built-in `say` command
+  is used. macOS writes AIFF files, which soundfile reads.
+- **Whisper audio:** the app decodes audio itself and passes the samples to Whisper, so
+  faster-whisper never needs PyAV to open files (faster-whisper 1.2.1 and PyAV 19 disagree on an
+  argument).
+- **Model download on Windows:** without Developer Mode, Windows cannot create symbolic links, so
+  the model files are copied instead. This works; the warning about it is switched off.
+- **Text encoding:** every file is read and written as UTF-8, and the scripts set `PYTHONUTF8=1`,
+  so a Windows console that is not UTF-8 cannot crash when Whisper prints unusual characters.
+- **Temporary files:** temporary folders ignore cleanup errors, because antivirus software on
+  Windows can lock a file for a moment.
+- **History file:** Windows locks `data/history.csv` while Excel has it open. The app then asks you
+  to close it instead of crashing.
+- **Line endings:** `.gitattributes` keeps `.bat` files in Windows (CRLF) format, which `cmd`
+  needs to read labels correctly.
 - **File names:** recordings use `-` instead of `:` in timestamps (Windows does not allow `:`).
 - **Paths:** pathlib everywhere, no POSIX-only code.
 
@@ -207,6 +233,7 @@ details still go to the terminal for the developers).
 | Unreadable format without ffmpeg | This audio format needs ffmpeg... or upload a .wav file. |
 | gTTS offline with engine "gtts" | gTTS needs internet... Choose backend 'auto' or 'pyttsx3'. |
 | Own reference chosen but not uploaded | Upload your own reference recording first. |
+| history.csv open in Excel (Windows) | Could not save this attempt because data/history.csv is open in another program... |
 | Whisper not downloaded and offline | Connect to the internet once and run: python scripts/prefetch_models.py |
 | Anything unexpected | Something unexpected went wrong (ErrorType). Please try again, or upload one of the demo files. |
 
@@ -216,7 +243,7 @@ details still go to the terminal for the developers).
 python -m pytest -q
 ```
 
-44 tests with synthetic, speech-like audio (harmonic "vowels" with formant peaks), so they need no
+45 tests with synthetic, speech-like audio (harmonic "vowels" with formant peaks), so they need no
 microphone, internet or Whisper model. They cover decoding and resampling, trimming and
 normalization, CMVN statistics, pitch on known tones, DTW path orientation, every score formula,
 the word diff, the full pipeline with a stand-in transcriber, privacy (no audio saved by default),

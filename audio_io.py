@@ -6,6 +6,7 @@ are always compared under identical conditions:
     decode -> mono -> resample to 16 kHz -> trim silence -> peak-normalize
 """
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -16,6 +17,10 @@ import numpy as np
 import soundfile as sf
 
 import config
+
+# On Windows, stop helper programs (ffmpeg, the offline voice) from flashing a
+# black console window. On macOS and Linux this flag is simply 0.
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
 class CoachError(Exception):
@@ -37,11 +42,12 @@ def _decode_with_ffmpeg(path):
             "This audio format needs ffmpeg, which is not installed. "
             "Install ffmpeg (see README) or upload a .wav file."
         )
-    with tempfile.TemporaryDirectory() as tmp:
+    # ignore_cleanup_errors: on Windows an antivirus scan can briefly lock the file
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         out = Path(tmp) / "decoded.wav"
         cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(path),
                "-ac", "1", "-ar", str(config.SAMPLE_RATE), str(out)]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, creationflags=NO_WINDOW)
         if result.returncode != 0 or not out.exists():
             raise CoachError("Could not read this audio file. Please try a .wav or .mp3 file.")
         y, sr = sf.read(str(out), dtype="float32")

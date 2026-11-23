@@ -7,9 +7,15 @@ The model is downloaded once into data/models/ and loaded from there after,
 so the app works offline.
 """
 
+import os
 from functools import lru_cache
 
-import config
+# Windows without Developer Mode cannot make symlinks, so the model download
+# copies files instead and prints a long warning. The copy works fine.
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+
+import config  # noqa: E402
+from audio_io import load_audio  # noqa: E402
 
 
 class SttUnavailable(Exception):
@@ -50,8 +56,12 @@ def is_model_cached(model_size=config.WHISPER_MODEL):
 def _transcribe_faster_whisper(wav_path, model_size):
     """Run faster-whisper and return (text, words)."""
     model = get_model(model_size)
+    # We decode the audio ourselves (soundfile, 16 kHz mono) and pass the samples.
+    # If faster-whisper got the file path, it would decode it with PyAV, and
+    # faster-whisper 1.2.1 uses an argument that PyAV 19 no longer accepts.
+    samples, _sr = load_audio(wav_path)
     segments, _info = model.transcribe(
-        str(wav_path),
+        samples,
         language="en",
         beam_size=1,                       # greedy decoding: fast and repeatable
         temperature=0.0,                   # no random sampling

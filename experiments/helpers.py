@@ -4,6 +4,7 @@ one (reference, learner) pair without Whisper, and Markdown tables.
 """
 
 import sys
+import warnings
 from pathlib import Path
 
 import librosa
@@ -23,12 +24,17 @@ def load(path):
 
 def stretch(y, speed):
     """Change the speed without changing the pitch (speed 2 = twice as fast)."""
-    return audio_io.preprocess(librosa.effects.time_stretch(y, rate=speed))
+    with warnings.catch_warnings():
+        # librosa's phase vocoder prints a harmless numba "invalid value in cast" warning
+        warnings.simplefilter("ignore", RuntimeWarning)
+        return audio_io.preprocess(librosa.effects.time_stretch(y, rate=speed))
 
 
 def shift(y, semitones):
     """Change the pitch without changing the speed."""
-    return audio_io.preprocess(librosa.effects.pitch_shift(y, sr=16000, n_steps=semitones))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)  # same harmless phase vocoder warning
+        return audio_io.preprocess(librosa.effects.pitch_shift(y, sr=16000, n_steps=semitones))
 
 
 def add_noise(y, snr_db, seed=0):

@@ -8,6 +8,7 @@ here (it is saved separately, and only if the learner opts in).
 import pandas as pd
 
 import config
+from audio_io import CoachError
 
 COLUMNS = [
     "timestamp", "sentence", "target_accent", "learner_accent", "reference_source",
@@ -21,7 +22,12 @@ def append_attempt(row, path=None):
     path = path or config.HISTORY_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
     frame = pd.DataFrame([{c: row.get(c) for c in COLUMNS}], columns=COLUMNS)
-    frame.to_csv(path, mode="a", header=not path.exists(), index=False)
+    try:
+        frame.to_csv(path, mode="a", header=not path.exists(), index=False, encoding="utf-8")
+    except PermissionError as exc:
+        # Windows locks a CSV file while Excel has it open.
+        raise CoachError("Could not save this attempt because data/history.csv is open in "
+                         "another program (for example Excel). Close it and press Analyze again.") from exc
 
 
 def load_history(path=None):
@@ -39,5 +45,8 @@ def clear_history(path=None):
     """Delete the history file. Returns the number of attempts that were removed."""
     path = path or config.HISTORY_FILE
     n = len(load_history(path))
-    path.unlink(missing_ok=True)
+    try:
+        path.unlink(missing_ok=True)
+    except PermissionError as exc:
+        raise CoachError("data/history.csv is open in another program. Close it and try again.") from exc
     return n

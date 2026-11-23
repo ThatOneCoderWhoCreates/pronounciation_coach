@@ -132,3 +132,15 @@ def test_auto_falls_back_to_offline_voice_and_says_so(monkeypatch, tmp_path):
 def test_unknown_accent_is_rejected():
     with pytest.raises(CoachError):
         tts.synthesize("Hello", "Martian English")
+
+
+def test_locked_history_file_gives_friendly_error(monkeypatch, tmp_history):
+    """On Windows, Excel locks an open CSV file; the learner should get a clear message."""
+    import pandas as pd
+
+    def locked(*args, **kwargs):
+        raise PermissionError("file is locked")
+
+    monkeypatch.setattr(pd.DataFrame, "to_csv", locked)
+    with pytest.raises(CoachError, match="open in"):
+        history.append_attempt({"sentence": "x"}, tmp_history)

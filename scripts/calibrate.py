@@ -30,9 +30,9 @@ import tts  # noqa: E402
 
 def save(results):
     """Merge {accent: (good, bad)} into data/calibration.json."""
-    current = json.loads(config.CALIBRATION_FILE.read_text()) if config.CALIBRATION_FILE.exists() else {}
+    current = json.loads(config.CALIBRATION_FILE.read_text(encoding="utf-8")) if config.CALIBRATION_FILE.exists() else {}
     current.update({k: [round(g, 4), round(b, 4)] for k, (g, b) in results.items()})
-    config.CALIBRATION_FILE.write_text(json.dumps(current, indent=2))
+    config.CALIBRATION_FILE.write_text(json.dumps(current, indent=2), encoding="utf-8")
     print(f"Saved to {config.CALIBRATION_FILE}")
 
 

@@ -17,13 +17,14 @@ import tempfile
 from pathlib import Path
 
 import config
-from audio_io import CoachError, load_audio, save_wav
+from audio_io import NO_WINDOW, CoachError, load_audio, save_wav
 
 # This small program runs in a SEPARATE Python process. pyttsx3 is known to
 # hang when it is called again from Gradio worker threads on Windows, so we
 # start a fresh process with a fresh engine for every sentence.
 _PYTTSX3_WORKER = """
 import sys, pyttsx3
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 text, out = sys.argv[1], sys.argv[2]
 engine = pyttsx3.init()
 voice_id = engine.getProperty("voice")
@@ -52,7 +53,7 @@ def _gtts(text, accent, out_path):
     from gtts import gTTS
 
     tld = config.ACCENTS[accent]  # KeyError here would mean an unknown accent
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         mp3 = Path(tmp) / "ref.mp3"
         gTTS(text=text, lang="en", tld=tld).save(str(mp3))
         y, sr = load_audio(mp3)  # soundfile first, then ffmpeg
@@ -63,12 +64,13 @@ def _gtts(text, accent, out_path):
 def _pyttsx3(text, out_path):
     """Synthesize offline with the operating system voice in a subprocess."""
     suffix = ".aiff" if platform.system() == "Darwin" else ".wav"  # macOS writes AIFF
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         raw = Path(tmp) / f"ref{suffix}"
         voice = None
         try:
             run = subprocess.run([sys.executable, "-c", _PYTTSX3_WORKER, text, str(raw)],
-                                 capture_output=True, text=True, timeout=60)
+                                 capture_output=True, text=True, encoding="utf-8",
+                                 errors="replace", timeout=60, creationflags=NO_WINDOW)
             if run.returncode == 0 and raw.exists() and raw.stat().st_size > 1000:
                 voice = run.stdout.strip().splitlines()[-1] if run.stdout.strip() else "system voice"
         except subprocess.TimeoutExpired:

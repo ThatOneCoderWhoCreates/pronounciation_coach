@@ -80,7 +80,7 @@ DTW_CALIBRATION = {
 # placeholders above, so nobody has to edit this file by hand.
 if CALIBRATION_FILE.exists():
     try:
-        for name, pair in json.loads(CALIBRATION_FILE.read_text()).items():
+        for name, pair in json.loads(CALIBRATION_FILE.read_text(encoding="utf-8")).items():
             DTW_CALIBRATION[name] = (float(pair[0]), float(pair[1]))
     except (ValueError, KeyError, IndexError, TypeError):
         pass  # a broken file must never stop the app; placeholders are used

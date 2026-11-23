@@ -143,7 +143,7 @@ def e7():
     models = [m for m in config.WHISPER_CHOICES if stt.is_model_cached(m)]
     if not models or not index.exists():
         return ["## E7. Whisper model comparison\nSkipped: needs downloaded models and demo files."]
-    clips = json.loads(index.read_text())
+    clips = json.loads(index.read_text(encoding="utf-8"))
     rows = []
     for m in models:
         stt.get_model(m)  # load once so loading time is not counted
@@ -172,6 +172,8 @@ def e8():
 
 def main():
     """Run everything and write results.md."""
+    # The Windows console may not be UTF-8; replace characters it cannot show.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     OUT.mkdir(parents=True, exist_ok=True)
     start = time.time()
     y, engine = reference(SENTENCES[0])

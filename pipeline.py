@@ -67,7 +67,7 @@ def analyze(sentence, ref_path, learner_path, accent, model_size=config.WHISPER_
     f_lrn = features.extract_all(y_lrn)
 
     # 2. Speech-to-text on the cleaned 16 kHz learner audio.
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         wav = audio_io.save_wav(y_lrn, Path(tmp) / "learner.wav")
         transcript, words = stt.transcribe(wav, model_size)
 

@@ -10,6 +10,7 @@ your own voices (see README, demo plan) and put them in demo/.
 
 import json
 import sys
+import warnings
 from pathlib import Path
 
 import librosa
@@ -43,6 +44,7 @@ def add_noise(y, snr_db, seed=0):
 
 def main():
     """Build each demo clip, save it as wav, and write demo/demo_files.json."""
+    warnings.simplefilter("ignore", RuntimeWarning)  # harmless numba warning from time_stretch
     config.DEMO_DIR.mkdir(exist_ok=True)
     us, online = voice(TARGET, "US English")
     uk, _ = voice(TARGET, "UK English")

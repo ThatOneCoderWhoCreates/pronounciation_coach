@@ -1,0 +1,18 @@
+{
+  "US English": [
+    0.3564,
+    0.6243
+  ],
+  "UK English": [
+    0.3439,
+    0.5735
+  ],
+  "Indian English": [
+    0.3889,
+    0.5852
+  ],
+  "Australian English": [
+    0.2994,
+    0.5951
+  ]
+}
