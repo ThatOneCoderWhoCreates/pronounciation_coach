@@ -2,6 +2,7 @@
 # pip picks the right line automatically from the "python_version" marker.
 gradio==6.32.0
 faster-whisper==1.2.1
+huggingface-hub==1.16.1
 soundfile==0.14.0
 matplotlib==3.11.2
 pandas==3.1.1
