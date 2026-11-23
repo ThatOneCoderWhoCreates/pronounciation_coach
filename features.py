@@ -7,6 +7,8 @@ Three features are extracted, all with a 10 ms hop so their frames line up:
     RMS energy (dB)   -> loudness over time
 """
 
+import warnings
+
 import librosa
 import numpy as np
 
@@ -53,10 +55,13 @@ def f0_semitones(y, sr=config.SAMPLE_RATE):
     speaker's own median means a low voice and a high voice saying the
     sentence with the same melody give the same contour. Unvoiced frames are NaN.
     """
-    f0, voiced, _ = librosa.pyin(
-        y, fmin=config.F0_MIN, fmax=config.F0_MAX, sr=sr,
-        frame_length=config.PYIN_FRAME, hop_length=config.HOP,
-    )
+    with warnings.catch_warnings():
+        # pyin can print a harmless numba "invalid value in cast" warning on silent frames
+        warnings.simplefilter("ignore", RuntimeWarning)
+        f0, voiced, _ = librosa.pyin(
+            y, fmin=config.F0_MIN, fmax=config.F0_MAX, sr=sr,
+            frame_length=config.PYIN_FRAME, hop_length=config.HOP,
+        )
     voiced = voiced & np.isfinite(f0)
     semitones = np.full(f0.shape, np.nan)
     if voiced.any():

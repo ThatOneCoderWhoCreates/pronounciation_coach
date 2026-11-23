@@ -109,6 +109,13 @@ def analyze(sentence, ref_path, learner_path, accent, model_size=config.WHISPER_
     }
 
 
+def dtw_cost_between(ref_path, learner_path):
+    """Normalized DTW cost between two audio files (used by calibration and experiments)."""
+    y_ref = audio_io.load_and_prepare(ref_path)
+    y_lrn = audio_io.load_and_prepare(learner_path)
+    return compare.dtw_align(features.mfcc_cmvn(y_ref), features.mfcc_cmvn(y_lrn))[2]
+
+
 def make_figures(result):
     """Build the five per-attempt figures from an analyze() result."""
     lrn_on_ref = compare.map_to_reference_time(
