@@ -18,7 +18,7 @@ SCORE_INFO = {
 DIFF_COLORS = {
     "correct": config.COLORS["good"],
     "wrong": config.COLORS["learner"],
-    "missing": config.COLORS["accent"],
+    "missing": config.COLORS["neutral"],
     "extra": "#56B4E9",  # Okabe-Ito sky blue
 }
 

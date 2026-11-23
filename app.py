@@ -141,7 +141,7 @@ def build_ui():
                             label="Demo recordings (use these if the microphone fails)")
             cards = gr.HTML()
             transcript = gr.HighlightedText(label="Transcript (green correct, red wrong, "
-                                            "orange missing, blue extra)",
+                                            "gray missing, blue extra)",
                                             color_map=ui_text.DIFF_COLORS, show_legend=True)
             details = gr.Markdown()
             figs = [gr.Plot(label=name) for name in

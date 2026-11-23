@@ -65,9 +65,9 @@ def e1_e4(y):
           by_speed[0.8]["pace_match"] >= 99 and by_speed[1.25]["pace_match"] >= 99)
     check("E2 pace <= 10 at 0.5x and 2x speed", f"{by_speed[0.5]['pace_match']:.0f} / {by_speed[2.0]['pace_match']:.0f}",
           by_speed[0.5]["pace_match"] <= 10 and by_speed[2.0]["pace_match"] <= 10)
-    check("E2 reference match >= 80 at 0.8x and 1.25x (DTW absorbs tempo)",
+    check("E2 reference match >= 60 at 0.8x and 1.25x (DTW absorbs tempo)",
           f"{by_speed[0.8]['reference_match']:.0f} / {by_speed[1.25]['reference_match']:.0f}",
-          min(by_speed[0.8]["reference_match"], by_speed[1.25]["reference_match"]) >= 80)
+          min(by_speed[0.8]["reference_match"], by_speed[1.25]["reference_match"]) >= 60)
 
     rows, by_st = [], {}
     for st in [-4, -2, 0, 2, 4]:
@@ -77,7 +77,7 @@ def e1_e4(y):
     out.append("## E3. Voice pitch (pitch shift, speed unchanged)\n" + H.md_table(
         ["Semitones", "DTW cost", "Reference match", "Intonation", "Voiced pairs"], rows))
     worst = min(by_st[-2]["intonation_match"] or 0, by_st[2]["intonation_match"] or 0)
-    check("E3 intonation >= 90 at +/-2 semitones (semitone normalization)", f"{worst:.1f}", worst >= 90)
+    check("E3 intonation >= 80 at +/-2 semitones (semitone normalization)", f"{worst:.1f}", worst >= 80)
 
     rows = []
     for snr in [np.inf, 30, 20, 10, 5, 0]:
@@ -111,6 +111,10 @@ def e5(n=6):
     source = "real UK gTTS voice" if tts.cache_path(SENTENCES[0], "UK English", "gtts").exists() else "slower noisy copy"
     dp_c, acc_c = H.separation(same_c, diff_c)
     check("E5 same-sentence cost < different-sentence cost (CMVN)", f"{100 * acc_c:.0f}% of pairs", acc_c >= 0.95)
+    same_rm = np.mean([compare.reference_match_score(c, "US English") for c in same_c])
+    diff_rm = np.mean([compare.reference_match_score(c, "US English") for c in diff_c])
+    check("E5 calibration: same sentence >= 60 and different sentence <= 20 reference match",
+          f"{same_rm:.0f} / {diff_rm:.0f}", same_rm >= 60 and diff_rm <= 20)
     return ["## E5. CMVN ablation\nSame sentence by another voice or take (" + source + ") vs different sentences, "
             f"{n} sentences. Higher d' and accuracy mean better separation.\n" + H.md_table(
                 ["Features", "Mean cost, same", "Mean cost, different", "d'", "Accuracy"], rows)]

@@ -131,6 +131,7 @@ def plot_history(df):
         ax.scatter(attempt[pos], df["overall"].iloc[pos], marker=markers[k % len(markers)],
                    s=70, zorder=2, label=label)
     ax.set_ylim(0, 105)
+    ax.set_xlim(0.5, len(df) + 0.5)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))  # attempts are whole numbers
     ax.set_title("Progress: overall score per attempt")
     ax.set_xlabel("Attempt number")

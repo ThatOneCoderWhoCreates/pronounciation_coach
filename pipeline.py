@@ -134,7 +134,7 @@ def system_status():
     import sys
     cached = len(list(config.CACHE_DIR.glob("*.wav")))
     return {
-        "python_ok": (3, 10) <= sys.version_info[:2] <= (3, 12),
+        "python_ok": (3, 11) <= sys.version_info[:2] <= (3, 12),
         "python": ".".join(map(str, sys.version_info[:3])),
         "ffmpeg": audio_io.ffmpeg_available(),
         "whisper_cached": stt.is_model_cached(config.WHISPER_MODEL),
