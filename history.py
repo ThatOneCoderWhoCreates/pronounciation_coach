@@ -41,6 +41,34 @@ def load_history(path=None):
         return pd.DataFrame(columns=COLUMNS)
 
 
+def recording_name(timestamp):
+    """File name of a saved recording: the attempt's timestamp with ':' replaced
+    by '-' (Windows does not allow ':' in file names)."""
+    return str(timestamp).replace(":", "-") + ".wav"
+
+
+def list_recordings(folder=None, path=None):
+    """
+    Return the saved recordings, newest first, as (label, file path) pairs.
+    The label shows the time, the sentence and the overall score of the
+    attempt the recording belongs to (matched through the timestamp).
+    """
+    folder = folder or config.RECORDINGS_DIR
+    if not folder.exists():
+        return []
+    attempts = {recording_name(r.timestamp): r for r in load_history(path).itertuples()}
+    out = []
+    for wav in sorted(folder.glob("*.wav"), reverse=True):
+        row = attempts.get(wav.name)
+        when = wav.stem[:10] + " " + wav.stem[11:].replace("-", ":")
+        if row is not None:
+            sentence = row.sentence if len(row.sentence) <= 45 else row.sentence[:42] + "..."
+            out.append((f"{when} | {sentence} | overall {row.overall:.0f}", str(wav)))
+        else:
+            out.append((when, str(wav)))
+    return out
+
+
 def clear_history(path=None):
     """Delete the history file. Returns the number of attempts that were removed."""
     path = path or config.HISTORY_FILE

@@ -144,3 +144,14 @@ def test_locked_history_file_gives_friendly_error(monkeypatch, tmp_history):
     monkeypatch.setattr(pd.DataFrame, "to_csv", locked)
     with pytest.raises(CoachError, match="open in"):
         history.append_attempt({"sentence": "x"}, tmp_history)
+
+
+def test_saved_recording_is_listed_with_its_attempt(wavs, fake_stt, tmp_history, tmp_path, monkeypatch):
+    """With "Save my recordings" ticked, the file is saved and shown in the Progress tab list."""
+    monkeypatch.setattr(config, "RECORDINGS_DIR", tmp_path / "rec")
+    fake_stt["text"] = SENTENCE
+    r = pipeline.analyze(SENTENCE, wavs["ref"], wavs["same"], "US English",
+                         save_recording=True, history_path=tmp_history)
+    assert r["recording_path"].exists()
+    listed = history.list_recordings(tmp_path / "rec", tmp_history)
+    assert len(listed) == 1 and "overall 100" in listed[0][0] and listed[0][1] == str(r["recording_path"])

@@ -66,10 +66,18 @@ a tab, or `--port 7861` to change the port.
 1. Choose a practice sentence from the list, or type your own.
 2. Choose the target accent (US, UK, Indian, Australian English), or "My own reference recording"
    and upload a teacher's or native speaker's recording.
-3. Press **1. Get reference** to hear the reference (cached after the first time).
-4. Record with the microphone, or upload a file, in **2. Your attempt**.
-5. Press **3. Analyze**. You get the score cards, the colored transcript and the plots.
-6. The attempt is stored. The **Progress** tab shows the trend.
+3. The reference audio loads by itself whenever the sentence, accent or voice engine changes
+   (cached after the first time). **Play reference from the start** rewinds it and plays it again.
+4. In **1. Your attempt**, press the red **Record** button, read the sentence, then press **Stop**,
+   or upload a file. The banner above it shows "Recording..." with a pulsing red dot while the
+   microphone is on, and "Attempt ready" when there is something to analyze.
+5. Press **2. Analyze**. You get the score cards, the colored transcript and the plots.
+6. The attempt is stored. The **Progress** tab shows the trend. If **Save my recordings** was
+   ticked, the recording is also listed under **Progress > Saved recordings**, where it can be
+   played back.
+
+The browser asks for microphone permission the first time you press Record. Until you allow it,
+the microphone list says "No microphone found".
 
 If the microphone fails, click any row under **Demo recordings**, then press Analyze.
 
@@ -104,7 +112,7 @@ pronunciation_coach/
   data/models/           downloaded Whisper models (filled by setup)
   data/calibration.json  calibrated (good, bad) costs (written by calibrate.py)
   demo/                  clips to upload if the microphone fails (made by setup)
-  tests/                 pytest tests with synthetic audio (45 tests, no internet needed)
+  tests/                 pytest tests with synthetic audio (46 tests, no internet needed)
   experiments/           run_experiments.py, helpers.py, results/results.md
   scripts/               calibrate.py, pregenerate_references.py, prefetch_models.py, make_demo_audio.py
   setup.sh               one-time setup for macOS and Linux
@@ -185,12 +193,19 @@ are good = 0.35 and bad = 0.90.
 
 ## 8. User interface (assumed Section 10)
 
-Three tabs: **Practice** (inputs, reference player, attempt recorder, score cards with a one-line
-explanation each, colored transcript, five plots, demo recordings), **Progress** (history plot,
-table, refresh and clear buttons) and **How it works** (method, scores, limitations, privacy).
-A setup-check line at the top shows the Python version, ffmpeg, whether Whisper is downloaded and
-how many reference clips are cached. Plots use font size 12 or larger and the Okabe-Ito
-color-blind-safe palette.
+Three tabs: **Practice** (inputs, a reference player that updates automatically with a
+play-from-the-start button, a recording-status banner, a centered recorder, score cards with a
+one-line explanation each, colored transcript, five plots, demo recordings), **Progress** (history
+plot with its legend in a section that opens and closes, so the legend never covers points,
+table, refresh and clear buttons, saved recordings with a player) and **How it works**
+(method, scores, limitations, privacy). A setup-check line at the top shows the Python version,
+ffmpeg, whether Whisper is downloaded and how many reference clips are cached.
+
+The app always uses a dark theme (it adds `?__theme=dark` to the address). Text is bright on dark
+backgrounds, and the plots use the same dark colors. Score cards color the number by level:
+green "Good" (80 or more), amber "Fair" (50 to 79), red "Needs work" (below 50); the word is
+shown too, so the meaning does not depend on color alone. Plots use font size 12 or larger and
+the brighter members of the Okabe-Ito color-blind-safe palette.
 
 Transcript colors: green correct, red wrong (shows what Whisper heard), gray missing, blue extra.
 
@@ -243,7 +258,7 @@ details still go to the terminal for the developers).
 python -m pytest -q
 ```
 
-45 tests with synthetic, speech-like audio (harmonic "vowels" with formant peaks), so they need no
+46 tests with synthetic, speech-like audio (harmonic "vowels" with formant peaks), so they need no
 microphone, internet or Whisper model. They cover decoding and resampling, trimming and
 normalization, CMVN statistics, pitch on known tones, DTW path orientation, every score formula,
 the word diff, the full pipeline with a stand-in transcriber, privacy (no audio saved by default),
@@ -328,7 +343,8 @@ The project is a git repository with one commit per phase (`git log`):
 
 **Live (about 6 minutes)**
 
-1. Show the sentence and play the reference in US English, then UK English: the accent changes.
+1. Show the sentence and play the reference in US English, then switch to UK English: the
+   reference reloads by itself and the accent changes.
 2. One member records live and presses Analyze. Walk through the cards, the transcript and the
    plots: waveforms, spectrograms (same color scale), pitch overlay, DTW path, scores.
 3. Click the demo rows: `demo_wrong_words.wav` (intelligibility drops), `demo_too_slow.wav` (pace
@@ -384,6 +400,7 @@ choices. Other assumptions and changes:
 ## 16. Privacy
 
 Only scores, transcripts and timestamps are stored, in `data/history.csv`. Learner audio is saved
-in `data/recordings/` only if **Save my recordings** is ticked (off by default). The learner's
+in `data/recordings/` only if **Save my recordings** is ticked (off by default); saved files are
+listed and playable in **Progress > Saved recordings**. **Clear history** keeps the recordings. The learner's
 accent is optional and stays on the computer. **Clear history** in the Progress tab deletes the
 file.

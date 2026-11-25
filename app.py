@@ -11,6 +11,7 @@ import json
 import traceback
 
 import gradio as gr
+import soundfile as sf
 
 import config
 import history
@@ -25,7 +26,7 @@ ACCENT_CHOICES = list(config.ACCENTS) + [config.OWN_REFERENCE]
 
 
 def friendly(fn):
-    """Turn any error into a short message box instead of a stack trace (Section 12)."""
+    """Turn any error into a short message box instead of a stack trace."""
     @functools.wraps(fn)
     def wrapper(*args):
         try:
@@ -51,33 +52,55 @@ def status_banner():
             f"cached reference clips: {s['cached_references']}")
 
 
-@friendly
-def on_get_reference(sentence, accent, backend, own_ref):
-    """Button 1: produce (or load from cache) the reference audio so it can be played."""
-    path, message, _source = pipeline.get_reference(sentence, accent, backend, own_ref)
-    return str(path), message
+def on_reference(sentence, accent, backend, own_ref):
+    """
+    Runs by itself whenever the sentence, accent, engine or own reference changes,
+    so there is no button to press. Problems are shown as text under the player
+    instead of a pop-up, because this runs without the learner asking for it.
+    """
+    try:
+        path, message, _source = pipeline.get_reference(sentence, accent, backend, own_ref)
+        return str(path), message
+    except CoachError as exc:
+        return None, f"**Reference not ready:** {exc}"
+    except Exception as exc:
+        traceback.print_exc()
+        return None, f"**Reference not ready:** unexpected {type(exc).__name__}."
+
+
+def on_recording_changed(audio_path):
+    """Show 'ready' (with the length) when an attempt has been recorded or uploaded."""
+    if not audio_path:
+        return gr.update()  # keep the current banner (for example "Recording...")
+    try:
+        seconds = sf.info(audio_path).duration
+    except Exception:
+        seconds = None
+    return ui_text.recording_status("ready", seconds)
 
 
 @friendly
 def on_analyze(sentence, accent, backend, own_ref, learner_audio, model, learner_accent, save):
-    """Button 2: score the attempt and fill in every output."""
+    """Analyze button: score the attempt and fill in every output."""
     if not learner_audio:
         raise CoachError("Record or upload your attempt first.")
     ref_path, message, source = pipeline.get_reference(sentence, accent, backend, own_ref)
     gr.Info("Analyzing... the first run loads Whisper and can take a few seconds.")
     r = pipeline.analyze(sentence, ref_path, learner_audio, accent, model, learner_accent,
                          source, backend, save)
+    saved = (f"\n\nRecording saved as `{r['recording_path'].name}` (see **Progress > Saved recordings**)."
+             if r["recording_path"] else "")
     details = (f"**Whisper heard:** {r['transcript'] or '(nothing)'}\n\n"
                f"Word error rate: {r['wer']:.2f} | normalized DTW cost: {r['dtw_cost']:.3f} | "
-               f"voiced pitch pairs: {r['voiced_pairs']} | speaking-rate ratio: {r['rate_ratio']:.2f}x\n\n"
-               f"{message}")
+               f"voiced pitch pairs: {r['voiced_pairs']} | speaking-rate ratio: {r['rate_ratio']:.2f}x"
+               f"\n\n{message}{saved}")
     return (str(ref_path), message, ui_text.score_cards_html(r["scores"]),
             ui_text.diff_to_highlights(r["diff"]), details, *pipeline.make_figures(r))
 
 
 @friendly
 def on_refresh():
-    """Progress tab: reload the history file."""
+    """Progress tab: reload the history file and the list of saved recordings."""
     df = history.load_history()
     if len(df):
         summary = (f"**{len(df)} attempts.** Best overall: {df['overall'].max():.0f}. "
@@ -86,32 +109,26 @@ def on_refresh():
         summary = "No attempts yet. Go to the Practice tab and press Analyze."
     cols = ["timestamp", "sentence", "target_accent", "intelligibility", "reference_match",
             "intonation_match", "pace_match", "overall"]
-    return plots.plot_history(df), df[cols].iloc[::-1], summary
+    recs = history.list_recordings()
+    first = recs[0][1] if recs else None
+    legend = ui_text.legend_html(plots.history_legend(df))
+    return (plots.plot_history(df), legend, df[cols].iloc[::-1], summary,
+            gr.update(choices=recs, value=first), first)
 
 
 @friendly
 def on_clear():
-    """Progress tab: delete all saved attempts."""
+    """Progress tab: delete all saved attempts (saved recordings are kept)."""
     n = history.clear_history()
-    gr.Info(f"Removed {n} attempts.")
+    gr.Info(f"Removed {n} attempts. Saved recordings were kept in data/recordings/.")
     return on_refresh()
 
 
-def demo_examples():
-    """Rows for gr.Examples from demo/demo_files.json (made by scripts/make_demo_audio.py)."""
-    index = config.DEMO_DIR / "demo_files.json"
-    if not index.exists():
-        return []
-    rows = json.loads(index.read_text(encoding="utf-8"))
-    return [[str(config.DEMO_DIR / r["file"]), r["sentence"], r["accent"], r["description"]]
-            for r in rows if (config.DEMO_DIR / r["file"]).exists()]
-
-
 def build_ui():
-    """Lay out the three tabs and connect the buttons to their functions."""
+    """Lay out the three tabs and connect the controls to their functions."""
     with gr.Blocks(title="Pronunciation Coach") as demo:
-        gr.Markdown("# Pronunciation Coach\nPick a sentence and an accent, listen, record "
-                    "yourself, then press **Analyze**.")
+        gr.Markdown("# Pronunciation Coach\nPick a sentence and an accent, listen to the reference, "
+                    "record yourself, then press **Analyze**.")
         gr.Markdown(status_banner())
         with gr.Tab("Practice"):
             with gr.Row():
@@ -126,15 +143,22 @@ def build_ui():
                                              label="Your accent (optional, stored locally)")
             own_ref = gr.Audio(sources=["upload"], type="filepath", visible=False,
                                label="Your own reference recording (teacher or native speaker)")
-            with gr.Row():
-                ref_btn = gr.Button("1. Get reference", variant="secondary")
-                ref_audio = gr.Audio(type="filepath", label="Reference audio", interactive=False)
+            ref_audio = gr.Audio(type="filepath", interactive=False, elem_id="ref-audio",
+                                 label="Reference audio (updates automatically when you change the sentence or accent)")
+            restart_btn = gr.Button("Play reference from the start", size="sm", elem_id="restart-ref")
             ref_msg = gr.Markdown()
-            learner = gr.Audio(sources=["microphone", "upload"], type="filepath",
-                               label="2. Your attempt (record or upload)")
-            save = gr.Checkbox(value=config.SAVE_RECORDINGS, label="Save my recordings (off by default)")
-            analyze_btn = gr.Button("3. Analyze", variant="primary", size="lg")
-            examples = demo_examples()
+            with gr.Row():
+                gr.Column(scale=1, min_width=0)
+                with gr.Column(scale=3):
+                    rec_status = gr.HTML(ui_text.recording_status("idle"))
+                    learner = gr.Audio(sources=["microphone", "upload"], type="filepath",
+                                       elem_id="learner-audio", label="1. Your attempt (record or upload)")
+                    save = gr.Checkbox(value=config.SAVE_RECORDINGS,
+                                       label="Save my recordings (off by default). They are kept in "
+                                             "data/recordings/ and listed in the Progress tab.")
+                    analyze_btn = gr.Button("2. Analyze", variant="primary", size="lg", elem_id="analyze-btn")
+                gr.Column(scale=1, min_width=0)
+            examples = pipeline.demo_examples()
             if examples:
                 note = gr.Textbox(label="What this demo file shows", interactive=False)
                 gr.Examples(examples, inputs=[learner, sentence, accent, note],
@@ -149,22 +173,43 @@ def build_ui():
         with gr.Tab("Progress"):
             summary = gr.Markdown()
             hist_plot = gr.Plot(label="Progress")
+            with gr.Accordion("Legend: which marker is which sentence", open=False):
+                legend_box = gr.HTML()
             table = gr.Dataframe(label="All attempts (newest first)", interactive=False)
             with gr.Row():
                 refresh_btn = gr.Button("Refresh")
                 clear_btn = gr.Button("Clear history", variant="stop")
+            gr.Markdown("### Saved recordings\nOnly attempts analyzed with **Save my recordings** "
+                        "ticked appear here. The files are in `data/recordings/`.")
+            rec_pick = gr.Dropdown(label="Choose a recording", choices=[])
+            rec_player = gr.Audio(type="filepath", interactive=False, label="Saved recording")
         with gr.Tab("How it works"):
             gr.Markdown(ui_text.ABOUT)
 
+        # The reference updates itself whenever one of its inputs changes.
+        ref_inputs, ref_outputs = [sentence, accent, backend, own_ref], [ref_audio, ref_msg]
         accent.change(lambda a: gr.update(visible=a == config.OWN_REFERENCE), accent, own_ref)
-        ref_btn.click(on_get_reference, [sentence, accent, backend, own_ref], [ref_audio, ref_msg])
+        for control in (sentence, accent, backend, own_ref):
+            control.change(on_reference, ref_inputs, ref_outputs)
+
+        # Runs only in the browser (fn=None): rewinds the reference player and plays it.
+        restart_btn.click(None, None, None, js=ui_text.restart_js("ref-audio"))
+
+        # Recording indicator.
+        learner.start_recording(lambda: ui_text.recording_status("live"), None, rec_status)
+        learner.change(on_recording_changed, learner, rec_status)
+        learner.clear(lambda: ui_text.recording_status("idle"), None, rec_status)
+
+        progress_outputs = [hist_plot, legend_box, table, summary, rec_pick, rec_player]
         analyze_btn.click(on_analyze,
                           [sentence, accent, backend, own_ref, learner, model, learner_accent, save],
                           [ref_audio, ref_msg, cards, transcript, details, *figs]
-                          ).then(on_refresh, None, [hist_plot, table, summary])
-        refresh_btn.click(on_refresh, None, [hist_plot, table, summary])
-        clear_btn.click(on_clear, None, [hist_plot, table, summary])
-        demo.load(on_refresh, None, [hist_plot, table, summary])
+                          ).then(on_refresh, None, progress_outputs)
+        refresh_btn.click(on_refresh, None, progress_outputs)
+        clear_btn.click(on_clear, None, progress_outputs)
+        rec_pick.change(lambda path: path, rec_pick, rec_player)
+        demo.load(on_reference, ref_inputs, ref_outputs)
+        demo.load(on_refresh, None, progress_outputs)
     return demo
 
 
@@ -174,5 +219,5 @@ if __name__ == "__main__":
     parser.add_argument("--no-browser", action="store_true", help="do not open a browser tab")
     args = parser.parse_args()
     build_ui().launch(server_name="127.0.0.1", server_port=args.port, inbrowser=not args.no_browser,
-                      theme=gr.themes.Soft(), css=ui_text.CSS,
+                      theme=gr.themes.Soft(), css=ui_text.CSS, js=ui_text.FORCE_DARK_JS,
                       allowed_paths=[str(config.DATA_DIR), str(config.DEMO_DIR)])

@@ -104,10 +104,17 @@ SAVE_RECORDINGS = False  # learner audio is NOT kept unless the user opts in
 PLOT_FONT = 12           # readable on a projector
 
 # Okabe-Ito colors: safe for the most common kinds of color blindness.
+# The brighter members of the palette are used because the app has a dark theme.
 COLORS = {
-    "reference": "#0072B2",  # blue
-    "learner": "#D55E00",    # vermilion
-    "accent": "#E69F00",     # orange
-    "good": "#009E73",       # green
-    "neutral": "#999999",    # gray
+    "reference": "#56B4E9",  # sky blue
+    "learner": "#E69F00",    # orange
+    "accent": "#F0E442",     # yellow
+    "good": "#2BC48A",       # green (a lighter Okabe-Ito green for dark backgrounds)
+    "neutral": "#9CA3AF",    # gray
 }
+
+# Dark theme for the plots, matching the app.
+PLOT_BG = "#111827"      # figure background
+PLOT_PANEL = "#1F2937"   # inside the axes
+PLOT_TEXT = "#F3F4F6"    # titles, labels and tick numbers
+PLOT_GRID = "#4B5563"    # axis lines

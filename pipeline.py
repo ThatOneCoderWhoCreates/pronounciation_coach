@@ -11,6 +11,7 @@ analyze(), so the user interface never contains signal processing code.
                               +--> Whisper --> transcript --> WER + word diff
 """
 
+import json
 import tempfile
 from datetime import datetime
 from functools import lru_cache
@@ -98,13 +99,14 @@ def analyze(sentence, ref_path, learner_path, accent, model_size=config.WHISPER_
         **{k: (None if v is None else round(v, 2)) for k, v in scores.items()},
         "ref_duration": round(f_ref["duration"], 3), "learner_duration": round(f_lrn["duration"], 3),
     }, history_path)
+    recording_path = None
     if save_recording:
-        name = stamp.replace(":", "-") + ".wav"  # ":" is not allowed in Windows file names
-        audio_io.save_wav(y_lrn, config.RECORDINGS_DIR / name)
+        recording_path = audio_io.save_wav(y_lrn, config.RECORDINGS_DIR / history.recording_name(stamp))
 
     return {
         "scores": scores, "transcript": transcript, "words": words, "wer": wer, "diff": diff,
         "dtw_cost": cost, "voiced_pairs": n_pairs, "rate_ratio": rate_ratio,
+        "recording_path": recording_path,
         "y_ref": y_ref, "y_lrn": y_lrn, "f_ref": f_ref, "f_lrn": f_lrn, "D": D, "path": path,
     }
 
@@ -127,6 +129,16 @@ def make_figures(result):
         plots.plot_dtw(result["D"], result["path"]),
         plots.plot_scores(result["scores"]),
     ]
+
+
+def demo_examples():
+    """Rows for gr.Examples from demo/demo_files.json (made by scripts/make_demo_audio.py)."""
+    index = config.DEMO_DIR / "demo_files.json"
+    if not index.exists():
+        return []
+    rows = json.loads(index.read_text(encoding="utf-8"))
+    return [[str(config.DEMO_DIR / r["file"]), r["sentence"], r["accent"], r["description"]]
+            for r in rows if (config.DEMO_DIR / r["file"]).exists()]
 
 
 def system_status():

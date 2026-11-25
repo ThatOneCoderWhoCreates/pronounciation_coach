@@ -20,11 +20,28 @@ import features  # noqa: E402
 C = config.COLORS
 SR, HOP = config.SAMPLE_RATE, config.HOP
 
+# One (matplotlib marker, same shape as a text symbol, color) per sentence in the
+# Progress plot. The text symbol lets the app show the legend outside the plot.
+HISTORY_STYLES = [
+    ("o", "\u25CF", "#56B4E9"), ("s", "\u25A0", "#E69F00"), ("^", "\u25B2", "#2BC48A"),
+    ("D", "\u25C6", "#F0E442"), ("v", "\u25BC", "#CC79A7"), ("P", "\u271A", "#FF7F50"),
+    ("X", "\u2716", "#F3F4F6"), ("*", "\u2605", "#B39DDB"), ("h", "\u2B22", "#4DD0E1"),
+    ("<", "\u25C0", "#FCA5A5"),
+]
+
 
 def _figure(rows=1, height=3.6, sharex=False):
-    """Create a wide figure with projector-friendly font sizes."""
-    matplotlib.rcParams.update({"font.size": config.PLOT_FONT, "axes.titlesize": config.PLOT_FONT + 2,
-                                "axes.labelsize": config.PLOT_FONT, "legend.fontsize": config.PLOT_FONT})
+    """Create a wide dark-themed figure with projector-friendly font sizes."""
+    matplotlib.rcParams.update({
+        "font.size": config.PLOT_FONT, "axes.titlesize": config.PLOT_FONT + 2,
+        "axes.labelsize": config.PLOT_FONT, "legend.fontsize": config.PLOT_FONT,
+        # dark background with bright text, so the plots match the app
+        "figure.facecolor": config.PLOT_BG, "axes.facecolor": config.PLOT_PANEL,
+        "text.color": config.PLOT_TEXT, "axes.labelcolor": config.PLOT_TEXT,
+        "axes.titlecolor": config.PLOT_TEXT, "xtick.color": config.PLOT_TEXT,
+        "ytick.color": config.PLOT_TEXT, "axes.edgecolor": config.PLOT_GRID,
+        "legend.facecolor": config.PLOT_PANEL, "legend.edgecolor": config.PLOT_GRID,
+    })
     fig = Figure(figsize=(10, height * rows), dpi=100, layout="constrained")
     axes = fig.subplots(rows, 1, sharex=sharex)
     return fig, axes
@@ -102,7 +119,7 @@ def plot_scores(scores):
     keys = ["intelligibility", "reference_match", "intonation_match", "pace_match", "overall"]
     values = [scores.get(k) for k in keys]
     fig, ax = _figure(height=3.8)
-    colors = [C["reference"]] * 4 + [C["good"]]
+    colors = [C["reference"]] * 4 + [C["good"]]  # overall score stands out in green
     bars = ax.bar(labels, [v if v is not None else 0 for v in values], color=colors)
     for bar, v in zip(bars, values):
         ax.text(bar.get_x() + bar.get_width() / 2, (v or 0) + 2,
@@ -124,17 +141,25 @@ def plot_history(df):
         return fig
     attempt = np.arange(1, len(df) + 1)
     ax.plot(attempt, df["overall"], color=C["neutral"], linewidth=1.2, zorder=1)
-    markers = ["o", "s", "^", "D", "v", "P", "X", "*", "h", "<"]
     for k, (sentence, idx) in enumerate(df.groupby("sentence", sort=False).groups.items()):
         pos = np.asarray(df.index.get_indexer(idx))
-        label = sentence if len(sentence) <= 40 else sentence[:37] + "..."
-        ax.scatter(attempt[pos], df["overall"].iloc[pos], marker=markers[k % len(markers)],
-                   s=70, zorder=2, label=label)
+        marker, _symbol, color = HISTORY_STYLES[k % len(HISTORY_STYLES)]
+        ax.scatter(attempt[pos], df["overall"].iloc[pos], marker=marker, color=color, s=80, zorder=2)
     ax.set_ylim(0, 105)
     ax.set_xlim(0.5, len(df) + 0.5)
-    ax.xaxis.set_major_locator(MaxNLocator(integer=True))  # attempts are whole numbers
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True, min_n_ticks=1))  # whole attempt numbers
     ax.set_title("Progress: overall score per attempt")
     ax.set_xlabel("Attempt number")
     ax.set_ylabel("Overall score (0 to 100)")
-    ax.legend(loc="lower right", fontsize=config.PLOT_FONT - 2)
+    # No legend inside the plot: it would hide points. The app shows it below the
+    # plot in a section that opens and closes (see history_legend).
     return fig
+
+
+def history_legend(df):
+    """(symbol, color, sentence) for each sentence, in the same order and style as plot_history."""
+    if df is None or len(df) == 0:
+        return []
+    sentences = list(df.groupby("sentence", sort=False).groups)
+    return [(HISTORY_STYLES[k % len(HISTORY_STYLES)][1], HISTORY_STYLES[k % len(HISTORY_STYLES)][2], s)
+            for k, s in enumerate(sentences)]
