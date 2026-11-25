@@ -8,6 +8,8 @@ All signal processing and AI work happens in pipeline.py and the modules it call
 import argparse
 import functools
 import json
+import os
+import threading
 import traceback
 
 import gradio as gr
@@ -21,6 +23,8 @@ import ui_text
 from audio_io import CoachError
 from stt import SttUnavailable
 
+# True when running on Hugging Face Spaces (the platform sets SPACE_ID).
+ON_SPACE = bool(os.environ.get("SPACE_ID"))
 SENTENCES = json.loads(config.SENTENCES_FILE.read_text(encoding="utf-8"))
 ACCENT_CHOICES = list(config.ACCENTS) + [config.OWN_REFERENCE]
 
@@ -153,7 +157,8 @@ def build_ui():
                     rec_status = gr.HTML(ui_text.recording_status("idle"))
                     learner = gr.Audio(sources=["microphone", "upload"], type="filepath",
                                        elem_id="learner-audio", label="1. Your attempt (record or upload)")
-                    save = gr.Checkbox(value=config.SAVE_RECORDINGS,
+                    # Hidden on the public server, so visitors' audio is never kept there.
+                    save = gr.Checkbox(value=False if ON_SPACE else config.SAVE_RECORDINGS, visible=not ON_SPACE,
                                        label="Save my recordings (off by default). They are kept in "
                                              "data/recordings/ and listed in the Progress tab.")
                     analyze_btn = gr.Button("2. Analyze", variant="primary", size="lg", elem_id="analyze-btn")
@@ -217,7 +222,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pronunciation Coach")
     parser.add_argument("--port", type=int, default=7860)
     parser.add_argument("--no-browser", action="store_true", help="do not open a browser tab")
+    parser.add_argument("--share", action="store_true", help="also create a temporary public link")
     args = parser.parse_args()
-    build_ui().launch(server_name="127.0.0.1", server_port=args.port, inbrowser=not args.no_browser,
+    if ON_SPACE:
+        # Public server: listen on all addresses and download Whisper now, not on the first click.
+        import stt
+        threading.Thread(target=stt.get_model, args=(config.WHISPER_MODEL,), daemon=True).start()
+    build_ui().launch(server_name="0.0.0.0" if ON_SPACE else "127.0.0.1",
+                      server_port=7860 if ON_SPACE else args.port,
+                      inbrowser=not (args.no_browser or ON_SPACE), share=args.share and not ON_SPACE,
                       theme=gr.themes.Soft(), css=ui_text.CSS, js=ui_text.FORCE_DARK_JS,
                       allowed_paths=[str(config.DATA_DIR), str(config.DEMO_DIR)])
